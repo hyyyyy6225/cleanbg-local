@@ -6,7 +6,7 @@
     1. 检查电脑环境（显卡 / 内存 / 磁盘 / Photoshop）
     2. 安装 VC++ 运行库（缺的话）
     3. 下载并解压 ComfyUI 官方便携版（约 1.8 GB）
-    4. 下载 6 个 AI 模型（约 18.2 GB，国内 ModelScope / hf-mirror 直连；其中 3 个小模型走作者自建的魔搭镜像，固定 v1 版本）
+    4. 下载 6 个 AI 模型（约 18.2 GB，国内 ModelScope / hf-mirror 直连；其中 5 个走作者自建的魔搭镜像（固定 v2 版本），主模型走魔搭官方仓库）
     5. 安装 3 个自定义节点 + 关掉后端的小节点
     6. 把插件装进 Photoshop，并把路径改好
     7. 建桌面快捷方式，最后启动一次后端做自检
@@ -244,10 +244,13 @@ $HF_LORA = "https://hf-mirror.com/prithivMLmods/FLUX.2-Klein-Object-Remover-Bbox
 $HF_BIRE = "https://hf-mirror.com/ZhengPeng7/BiRefNet/resolve/main/model.safetensors"
 
 # 作者自建镜像（魔搭，固定 v1 版本；比第三方镜像稳，出处见仓库 README）
-$OWN_BASE = "https://modelscope.cn/api/v1/models/zdccy123/cleanbg-models/repo?Revision=v1&FilePath="
+$OWN_BASE = "https://modelscope.cn/api/v1/models/zdccy123/cleanbg-models/repo?Revision=v2&FilePath="
 $OWN_UP   = $OWN_BASE + "upscale_models%2F4x-UltraSharp.pth"
 $OWN_LORA = $OWN_BASE + "loras%2FF2K9B_ObjectRemover.safetensors"
 $OWN_BIRE = $OWN_BASE + "BiRefNet%2FGeneral.safetensors"
+$OWN_VAE  = $OWN_BASE + "vae%2Fflux2-vae.safetensors"
+$OWN_CLIP = $OWN_BASE + "clip%2Fqwen_3_8b_fp8mixed.safetensors"
+$OWN_UNET = $OWN_BASE + "unet%2Fflux-2-klein-9b-fp8.safetensors"
 $PORTABLE_GH  = "https://github.com/Comfy-Org/ComfyUI/releases/download/v0.36.0/ComfyUI_windows_portable_nvidia.7z"
 $PORTABLE_MIR = @(
     "https://gh-proxy.com/$PORTABLE_GH",
@@ -262,8 +265,8 @@ if ($CheckOnly) {
     $tests = @(
         @("ComfyUI 便携版", $PORTABLE_MIR[0]),
         @("扩散模型 UNET",  $MS_UNET),
-        @("文本编码器 CLIP", $MS_CLIP),
-        @("VAE",            $MS_VAE),
+        @("文本编码器 CLIP(自建镜像)", $OWN_CLIP),
+        @("VAE(自建镜像)",             $OWN_VAE),
         @("放大模型",        $OWN_UP),
         @("移除 LoRA",       $OWN_LORA),
         @("抠人 BiRefNet",   $OWN_BIRE)
@@ -343,13 +346,13 @@ foreach ($d in @("unet","clip","vae","upscale_models","loras","BiRefNet")) {
 
 if (-not $SkipModels) {
     # 小的先下（能快速看到进展）
-    Get-BigFile -urls @($MS_VAE, $HF_VAE) -dest (Join-Path $models "vae\flux2-vae.safetensors")        -expect 336211292 -name "VAE 模型 (313 MB)"    | Out-Null
+    Get-BigFile -urls @($OWN_VAE, $MS_VAE, $HF_VAE) -dest (Join-Path $models "vae\flux2-vae.safetensors")        -expect 336211292 -name "VAE 模型 (313 MB)"    | Out-Null
     Get-BigFile -urls @($OWN_UP, $HF_UP)            -dest (Join-Path $models "upscale_models\4x-UltraSharp.pth") -expect 66961958  -name "放大模型 (62 MB)"     | Out-Null
     Get-BigFile -urls @($OWN_LORA, $HF_LORA)          -dest (Join-Path $models "loras\F2K9B_ObjectRemover.safetensors") -expect 87070328 -name "移除 LoRA (81 MB)" | Out-Null
     Get-BigFile -urls @($OWN_BIRE, $HF_BIRE)          -dest (Join-Path $models "BiRefNet\General.safetensors")     -expect 444473596 -name "抠人模型 (414 MB)"    | Out-Null
     # 大的后下
-    Get-BigFile -urls @($MS_CLIP)          -dest (Join-Path $models "clip\qwen_3_8b_fp8mixed.safetensors") -expect 8664848742 -name "文本编码器 (8.07 GB)" | Out-Null
-    Get-BigFile -urls @($MS_UNET)          -dest (Join-Path $models "unet\flux-2-klein-9b-fp8.safetensors") -expect 9433061528 -name "主模型 (8.79 GB)"   | Out-Null
+    Get-BigFile -urls @($OWN_CLIP, $MS_CLIP)          -dest (Join-Path $models "clip\qwen_3_8b_fp8mixed.safetensors") -expect 8664848742 -name "文本编码器 (8.07 GB)" | Out-Null
+    Get-BigFile -urls @($OWN_UNET, $MS_UNET)          -dest (Join-Path $models "unet\flux-2-klein-9b-fp8.safetensors") -expect 9433061528 -name "主模型 (8.79 GB)"   | Out-Null
 
     # 包里自带的两个模型（如果有，就本地复制，省一次下载）
     $bundled = Join-Path $here "4-附加模型"
