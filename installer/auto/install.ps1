@@ -6,7 +6,7 @@
     1. 检查电脑环境（显卡 / 内存 / 磁盘 / Photoshop）
     2. 安装 VC++ 运行库（缺的话）
     3. 下载并解压 ComfyUI 官方便携版（约 1.8 GB）
-    4. 下载 6 个 AI 模型（约 18.2 GB，国内 ModelScope / hf-mirror 直连）
+    4. 下载 6 个 AI 模型（约 18.2 GB，国内 ModelScope / hf-mirror 直连；其中 3 个小模型走作者自建的魔搭镜像，固定 v1 版本）
     5. 安装 3 个自定义节点 + 关掉后端的小节点
     6. 把插件装进 Photoshop，并把路径改好
     7. 建桌面快捷方式，最后启动一次后端做自检
@@ -242,6 +242,12 @@ $HF_VAE  = "https://hf-mirror.com/Comfy-Org/vae-text-encorder-for-flux-klein-4b/
 $HF_UP   = "https://hf-mirror.com/Kim2091/UltraSharp/resolve/main/4x-UltraSharp.pth"
 $HF_LORA = "https://hf-mirror.com/prithivMLmods/FLUX.2-Klein-Object-Remover-Bbox/resolve/main/FLUX.2-Klein-Object-Remover-Bbox-5000.safetensors"
 $HF_BIRE = "https://hf-mirror.com/ZhengPeng7/BiRefNet/resolve/main/model.safetensors"
+
+# 作者自建镜像（魔搭，固定 v1 版本；比第三方镜像稳，出处见仓库 README）
+$OWN_BASE = "https://modelscope.cn/api/v1/models/zdccy123/cleanbg-models/repo?Revision=v1&FilePath="
+$OWN_UP   = $OWN_BASE + "upscale_models%2F4x-UltraSharp.pth"
+$OWN_LORA = $OWN_BASE + "loras%2FF2K9B_ObjectRemover.safetensors"
+$OWN_BIRE = $OWN_BASE + "BiRefNet%2FGeneral.safetensors"
 $PORTABLE_GH  = "https://github.com/Comfy-Org/ComfyUI/releases/download/v0.36.0/ComfyUI_windows_portable_nvidia.7z"
 $PORTABLE_MIR = @(
     "https://gh-proxy.com/$PORTABLE_GH",
@@ -258,9 +264,9 @@ if ($CheckOnly) {
         @("扩散模型 UNET",  $MS_UNET),
         @("文本编码器 CLIP", $MS_CLIP),
         @("VAE",            $MS_VAE),
-        @("放大模型",        $HF_UP),
-        @("移除 LoRA",       $HF_LORA),
-        @("抠人 BiRefNet",   $HF_BIRE)
+        @("放大模型",        $OWN_UP),
+        @("移除 LoRA",       $OWN_LORA),
+        @("抠人 BiRefNet",   $OWN_BIRE)
     )
     foreach ($t in $tests) {
         if (Test-Url -url $t[1]) { Ok ($t[0] + " 下载源可用") } else { Bad ($t[0] + " 下载源不可用：" + $t[1]) }
@@ -338,9 +344,9 @@ foreach ($d in @("unet","clip","vae","upscale_models","loras","BiRefNet")) {
 if (-not $SkipModels) {
     # 小的先下（能快速看到进展）
     Get-BigFile -urls @($MS_VAE, $HF_VAE) -dest (Join-Path $models "vae\flux2-vae.safetensors")        -expect 336211292 -name "VAE 模型 (313 MB)"    | Out-Null
-    Get-BigFile -urls @($HF_UP)            -dest (Join-Path $models "upscale_models\4x-UltraSharp.pth") -expect 66961958  -name "放大模型 (62 MB)"     | Out-Null
-    Get-BigFile -urls @($HF_LORA)          -dest (Join-Path $models "loras\F2K9B_ObjectRemover.safetensors") -expect 87070328 -name "移除 LoRA (81 MB)" | Out-Null
-    Get-BigFile -urls @($HF_BIRE)          -dest (Join-Path $models "BiRefNet\General.safetensors")     -expect 444473596 -name "抠人模型 (414 MB)"    | Out-Null
+    Get-BigFile -urls @($OWN_UP, $HF_UP)            -dest (Join-Path $models "upscale_models\4x-UltraSharp.pth") -expect 66961958  -name "放大模型 (62 MB)"     | Out-Null
+    Get-BigFile -urls @($OWN_LORA, $HF_LORA)          -dest (Join-Path $models "loras\F2K9B_ObjectRemover.safetensors") -expect 87070328 -name "移除 LoRA (81 MB)" | Out-Null
+    Get-BigFile -urls @($OWN_BIRE, $HF_BIRE)          -dest (Join-Path $models "BiRefNet\General.safetensors")     -expect 444473596 -name "抠人模型 (414 MB)"    | Out-Null
     # 大的后下
     Get-BigFile -urls @($MS_CLIP)          -dest (Join-Path $models "clip\qwen_3_8b_fp8mixed.safetensors") -expect 8664848742 -name "文本编码器 (8.07 GB)" | Out-Null
     Get-BigFile -urls @($MS_UNET)          -dest (Join-Path $models "unet\flux-2-klein-9b-fp8.safetensors") -expect 9433061528 -name "主模型 (8.79 GB)"   | Out-Null
@@ -374,6 +380,29 @@ if (-not $SkipModels) {
         if ((Test-Path $f) -and ((Get-Item $f).Length -ge ($n[1] - 1048576))) { Ok ($n[2] + " 就位") }
         else { Bad ($n[2] + " 缺失或不完整：" + $f); $allOk = $false }
     }
+    # ---- SHA256 完整性校验（4 个小模型全量校验；两个大模型只查大小，省时间）----
+    $shaMap = @{
+        "BiRefNet\General.safetensors" = "9ab37426bf4de0567af6b5d21b16151357149139362e6e8992021b8ce356a154"
+        "clip\qwen_3_8b_fp8mixed.safetensors" = "be2e86b1dd68bcb6818acf159c5b038d37495496e0a7355734ae0c64edce144c"
+        "loras\F2K9B_ObjectRemover.safetensors" = "d3b728e744b09ddf5ea20142f5e559162eabb243f3744298165a7de1ecf5f903"
+        "unet\flux-2-klein-9b-fp8.safetensors" = "865ba09f5b4c3cbd3468a4bd3acb9fcb2f8740c54317482f0bcd4ed1d3655cee"
+        "upscale_models\4x-UltraSharp.pth" = "a5812231fc936b42af08a5edba784195495d303d5b3248c24489ef0c4021fe01"
+        "vae\flux2-vae.safetensors" = "868fe7b343cc8f3a19dbcfcafbc3d5f888802be3f89bd81b65b3621a066ce8f3"
+    }
+    $smallFiles = @("vae\flux2-vae.safetensors", "upscale_models\4x-UltraSharp.pth", "loras\F2K9B_ObjectRemover.safetensors", "BiRefNet\General.safetensors")
+    foreach ($sf in $smallFiles) {
+        $fp = Join-Path $models $sf
+        if (-not (Test-Path $fp)) { continue }
+        $real = (Get-FileHash -LiteralPath $fp -Algorithm SHA256).Hash.ToLower()
+        if ($real -eq $shaMap[$sf]) { Ok ($sf + " SHA256 校验通过") }
+        else {
+            Bad ($sf + " SHA256 不匹配 —— 文件可能损坏或被换过，已删掉，再双击一次安装脚本会重下")
+            Remove-Item -LiteralPath $fp -Force -ErrorAction SilentlyContinue
+            $allOk = $false
+        }
+    }
+    Log "  （两个大模型只校验文件大小：完整 SHA256 校验要多花几分钟，需要时可手动核对 docs\依赖清单.md）"
+
     if (-not $allOk) {
         Warn "有模型没下完。再双击一次安装脚本，会接着下没完成的部分。"
     }
