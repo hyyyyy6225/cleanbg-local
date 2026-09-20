@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 10px;
+      font-family: "Microsoft YaHei", sans-serif; font-size: 12px;
+      background: #232323; color: #e6e6e6;
+    }
+    h3 { margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #fff; }
+    .row { margin-bottom: 8px; }
+    label { display: block; margin-bottom: 3px; color: #a8a8a8; font-size: 11px; }
+    textarea {
+      width: 100%; height: 88px; resize: vertical;
+      background: #2f2f2f; color: #e6e6e6; border: 1px solid #454545;
+      border-radius: 4px; padding: 6px; font-size: 11px; line-height: 1.45;
+      font-family: "Microsoft YaHei", sans-serif;
+    }
+    select {
+      background: #2f2f2f; color: #e6e6e6; border: 1px solid #454545;
+      border-radius: 4px; padding: 3px 5px; font-size: 11px; width: 100%;
+    }
+    input[type="text"] {
+      width: 100%; background: #2f2f2f; color: #e6e6e6; border: 1px solid #454545;
+      border-radius: 4px; padding: 4px 5px; font-size: 10px;
+      font-family: "Microsoft YaHei", sans-serif;
+    }
+    .grid2 { display: flex; gap: 6px; }
+    .grid2 > div { flex: 1; }
+    button {
+      width: 100%; padding: 8px; margin-bottom: 6px;
+      background: #3d6be0; color: #fff; border: none; border-radius: 5px;
+      font-size: 12px; cursor: pointer; font-family: "Microsoft YaHei", sans-serif;
+    }
+    button:hover { background: #4f7bef; }
+    button:disabled { background: #4a4a4a; color: #909090; cursor: default; }
+    button.ghost { background: #3a3a3a; font-size: 11px; padding: 6px; }
+    button.ghost:hover { background: #484848; }
+    .grid2 button { margin-bottom: 0; }
+
+    /* 进度条 */
+    .barwrap {
+      height: 9px; background: #2b2b2b; border-radius: 5px; overflow: hidden;
+      border: 1px solid #3d3d3d;
+    }
+    #bar {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #3d6be0, #57a0ff);
+      transition: width .25s ease;
+    }
+    #barText { font-size: 10px; color: #9a9a9a; margin-top: 3px; min-height: 13px; }
+
+    #status { font-size: 11px; color: #9fd0ff; margin: 6px 0 2px 0; min-height: 15px; }
+    #log {
+      margin-top: 6px; height: 104px; overflow-y: auto;
+      background: #1b1b1b; border: 1px solid #383838; border-radius: 4px;
+      padding: 5px; font-size: 10px; line-height: 1.5; color: #b8b8b8;
+      white-space: pre-wrap; word-break: break-all;
+    }
+    .hint { color: #7f7f7f; font-size: 10px; line-height: 1.5; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h3>清空环境（本地模型）</h3>
+
+  <div class="row">
+    <label>提示词</label>
+    <textarea id="prompt"></textarea>
+  </div>
+
+  <div class="row grid2">
+    <div>
+      <label>生成规模</label>
+      <select id="quality">
+        <option value="1.8">快（1536 长边）</option>
+        <option value="2.9" selected>标准（2048 长边）</option>
+        <option value="4.4">精细（2560 长边）</option>
+      </select>
+    </div>
+    <div>
+      <label>步数</label>
+      <select id="steps">
+        <option value="4" selected>4</option>
+        <option value="6">6</option>
+        <option value="8">8</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="row">
+    <label>处理范围</label>
+    <select id="range">
+      <option value="protect" selected>自动保护人物 · 只清背景（推荐）</option>
+      <option value="full">整图重绘（人物也会被重画）</option>
+      <option value="sel">仅清理 PS 选区</option>
+    </select>
+  </div>
+
+  <div class="row" id="invertRow" style="display:none;">
+    <label><input type="checkbox" id="invertSel" style="width:auto;margin-right:5px;vertical-align:-1px;" />反选选区（保护选区内，清选区外）</label>
+  </div>
+
+  <div class="row">
+    <label><input type="checkbox" id="useLora" checked style="width:auto;margin-right:5px;vertical-align:-1px;" />附加 LoRA：<span id="loraName">检测中…</span></label>
+  </div>
+
+  <button id="run">▶ 清空环境</button>
+
+  <div class="row">
+    <div class="barwrap"><div id="bar"></div></div>
+    <div id="barText">就绪</div>
+  </div>
+
+  <div class="row grid2">
+    <div><button id="startComfy" class="ghost">启动 ComfyUI</button></div>
+    <div><button id="stopComfy" class="ghost">关闭 ComfyUI</button></div>
+  </div>
+
+  <div class="row">
+    <label>后端目录（ComfyUI 便携版所在文件夹 · 挪过位置就改这里，会自动记住）</label>
+    <div class="grid2" style="align-items:center;">
+      <div><input type="text" id="comfyDir" /></div>
+      <div style="flex:0 0 48px;"><button id="comfyDirSave" class="ghost" style="margin-bottom:0;">应用</button></div>
+      <div style="flex:0 0 62px;"><button id="comfyDirAuto" class="ghost" style="margin-bottom:0;">自动查找</button></div>
+    </div>
+    <div id="dirHint" class="hint" style="margin-top:3px;"></div>
+  </div>
+
+  <div id="status">就绪</div>
+  <div id="log"></div>
+  <div class="hint">
+    结果会作为新图层（智能对象）置入当前文档，原图不动；不满意的部分用蒙版擦。<br>
+    <b>自动保护人物</b>：用 BiRefNet 抠出人物，只重绘背景，人物像素级不动（约多花 5 秒）。<br>
+    <b>仅清理 PS 选区</b>：先在 PS 里框出要清的区域，只重绘框内。<br>
+    用公开模型 flux-2-klein-9b-fp8，无需联网登录。<br>
+    <b>后端不会自动启动</b>：要用的时候点【启动 ComfyUI】。<br>
+    <b>关闭 Photoshop 时后端会自动关闭</b>；也可以点【关闭 ComfyUI】立刻关掉、释放显存。
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>

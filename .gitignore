@@ -1,0 +1,31 @@
+# 安装/运行产生的日志与临时文件
+安装日志.txt
+更新日志.txt
+*.log
+
+# 覆盖安装时的备份
+*.bak
+*.nobom.bak
+
+# 便携版整包与模型（体积太大，绝不入库）
+清空环境-便携版/
+ComfyUI/
+python/
+models/
+*.safetensors
+*.pth
+*.ckpt
+*.gguf
+
+# 打好的发布包
+*.zip
+*.7z
+*.rar
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+__pycache__/
+*.pyc

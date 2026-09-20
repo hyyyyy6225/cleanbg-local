@@ -1,0 +1,54 @@
+{
+  "id": "cleanbg-local-panel",
+  "name": "清空环境(本地)",
+  "version": "1.0.0",
+  "main": "index.html",
+  "manifestVersion": 6,
+  "host": {
+    "app": "PS",
+    "minVersion": "26.0.0"
+  },
+  "entrypoints": [
+    {
+      "type": "panel",
+      "id": "mainPanel",
+      "label": {
+        "default": "清空环境",
+        "zh": "清空环境"
+      },
+      "icons": [
+        {
+          "width": 24,
+          "height": 24,
+          "path": "icons/icon.png",
+          "scale": [1, 2],
+          "theme": ["all"]
+        }
+      ],
+      "minimumSize": { "width": 240, "height": 320 },
+      "maximumSize": { "width": 1200, "height": 2400 },
+      "preferredDockedSize": { "width": 320, "height": 520 },
+      "preferredFloatingSize": { "width": 360, "height": 620 }
+    }
+  ],
+  "requiredPermissions": {
+    "localFileSystem": "fullAccess",
+    "launchProcess": {
+      "schemes": ["file"],
+      "extensions": [".bat", ".cmd", ".exe", ".vbs"]
+    },
+    "network": {
+      "domains": "all"
+    },
+    "clipboard": "readAndWrite"
+  },
+  "icons": [
+    {
+      "width": 24,
+      "height": 24,
+      "path": "icons/icon.png",
+      "scale": [1, 2],
+      "theme": ["all"]
+    }
+  ]
+}

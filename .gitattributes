@@ -1,0 +1,20 @@
+# 让 .bat / .vbs / .ps1 始终保持 Windows 原生换行（cmd 与 wscript 对纯 LF 不友好）
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.vbs text eol=crlf
+*.ps1 text eol=crlf
+
+# 文本文件统一 LF
+*.md   text eol=lf
+*.js   text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.py   text eol=lf
+*.txt  text eol=crlf
+
+# 二进制
+*.png binary
+*.exe binary
+*.zip binary
+*.safetensors binary
+*.pth binary
