@@ -156,7 +156,7 @@ if ($os.Major -lt 10) { Bad "需要 Windows 10 或更高版本"; $ok = $false } 
 
 $ramGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 1)
 Log ("  内存: $ramGB GB")
-if ($ramGB -lt 16) { Warn "内存偏小（建议 24 GB 以上）" } else { Ok "内存够用" }
+if ($ramGB -lt 16) { Warn ("内存只有 " + $ramGB + " GB，低于实测下限（16 GB），可能跑不动；建议加到 16 GB 以上") } else { Ok ("内存 " + $ramGB + " GB，够用") }
 
 $gpu = "未知"
 try {
@@ -183,7 +183,8 @@ if ($gpu -eq "未知") {
     Log ("  显卡: " + $gpu)
     if ($gpu -match "(\d+)\s*MiB") {
         $vram = [int]$Matches[1] / 1024
-        if ($vram -lt 10) { Warn ("显存约 " + [math]::Round($vram, 1) + " GB，偏小，建议把生成规模选「快」") }
+        if ($vram -lt 8) { Warn ("显存约 " + [math]::Round($vram, 1) + " GB，低于实测下限（8 GB），可能跑不动；可先装，运行时把生成规模选「快」") }
+elseif ($vram -lt 12) { Warn ("显存约 " + [math]::Round($vram, 1) + " GB —— 能跑但慢：请把生成规模选「快（1.8MP）」+ 4 步") }
         else { Ok ("显存约 " + [math]::Round($vram, 1) + " GB，够用") }
     }
 }
