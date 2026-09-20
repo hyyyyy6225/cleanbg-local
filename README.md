@@ -40,6 +40,13 @@
 
 ## 安装
 
+> **国内用户请注意**：GitHub 的下载通道在国内经常连不上（浏览器、IDM 都可能卡住）。
+> 作者已把安装包和模型都镜像到**魔搭（ModelScope）**，国内直连、速度快：
+>
+> - 📦 **一键安装包（373 KB）**：https://modelscope.cn/models/zdccy123/cleanbg-downloads
+> - 🧩 模型镜像：`zdccy123/cleanbg-models`（安装脚本会自动从这里下载）
+> - 如果非要走 GitHub，给链接加个加速前缀即可：`https://gh-proxy.com/` + 原链接
+
 ### 方式一：自动安装（推荐，约 20 GB 下载）
 
 1. 下载本仓库（绿 Code → Download ZIP）并解压
