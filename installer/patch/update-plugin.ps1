@@ -53,9 +53,18 @@ if (-not $isAdmin) {
 Ok "已获得管理员权限"
 
 # ---------------------------------------------------------------- 检查补丁自身
-$newSrc = Join-Path $here "插件本体\cleanbg"
-if (-not (Test-Path (Join-Path $newSrc "main.js"))) {
-    Bad ("补丁里的插件文件缺失：" + $newSrc)
+# 补丁里的插件文件可能在三个地方：补丁包布局（插件本体\）、安装包布局（1-插件本体\）、
+# 仓库布局（仓库根的 plugin\）。三种都找一遍，找到哪个用哪个。
+$newSrc = $null
+foreach ($c in @("插件本体\cleanbg", "1-插件本体\cleanbg", "plugin\cleanbg")) {
+    foreach ($r in @($here, (Join-Path $here "..\.."))) {
+        try { $p = (Resolve-Path -LiteralPath (Join-Path $r $c) -ErrorAction Stop).Path } catch { continue }
+        if (Test-Path (Join-Path $p "main.js")) { $newSrc = $p; break }
+    }
+    if ($newSrc) { break }
+}
+if (-not $newSrc -or -not (Test-Path (Join-Path $newSrc "main.js"))) {
+    Bad "补丁里的插件文件缺失（找过：插件本体\cleanbg、1-插件本体\cleanbg、plugin\cleanbg）"
     Log "  请确认压缩包解压完整（不是直接在压缩包里双击）。" "Yellow"
     Read-Host "`n按回车键退出"
     exit

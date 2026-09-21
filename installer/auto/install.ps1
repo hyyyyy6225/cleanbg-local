@@ -36,6 +36,28 @@ try { $here = (Resolve-Path $here).Path } catch {}
 $logFile = Join-Path $here "安装日志.txt"
 $stage   = Join-Path $here "_下载缓存"
 
+# ------------------------------------------------------------------ 素材定位
+# 本脚本有两种被使用的布局，两种都要能跑：
+#   ① 安装包布局：素材就在本脚本旁边（1-插件本体\ / 2-后端脚本\ / 3-自定义节点\）
+#   ② 仓库布局  ：从 GitHub 下载仓库 ZIP 解压后直接双击（素材在仓库根：plugin\ / backend\ / custom_nodes\）
+# Resolve-Asset 依次尝试上面两套路径，谁存在就用谁。$here\..\.. = 仓库根。
+$assetRoots = @()
+foreach ($r in @($here, (Join-Path $here ".."), (Join-Path $here "..\.."))) {
+    try { $assetRoots += (Resolve-Path -LiteralPath $r -ErrorAction Stop).Path } catch {}
+}
+function Resolve-Asset {
+    param([string[]]$Rel)
+    # 注意：循环变量必须用与参数不同的名字。PowerShell 变量大小写不敏感，
+    # 若写成 foreach ($rel in $Rel) 就是"自己遍历自己"，元素会变成 String[] 而不是字符串。
+    foreach ($cand in $Rel) {
+        foreach ($root in $assetRoots) {
+            $p = Join-Path $root $cand
+            if (Test-Path -LiteralPath $p) { return $p }
+        }
+    }
+    return $null
+}
+
 # ------------------------------------------------------------------ 输出/日志
 function Log {
     param([string]$m, [string]$color = "Gray")
@@ -302,8 +324,8 @@ New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
 # ------------------------------------------------------------------ 第 4 步：ComfyUI 便携版
 Step 4 8 "下载并解压 ComfyUI（约 1.8 GB）"
-$sevenZip = Join-Path $here "7zr.exe"
-if (-not (Test-Path $sevenZip)) {
+$sevenZip = Resolve-Asset @("7zr.exe")
+if (-not $sevenZip) {
     $sevenZip = Join-Path $stage "7zr.exe"
     if (-not (Get-BigFile -urls @("https://github.com/ip7z/7zip/releases/download/26.03/7zr.exe") -dest $sevenZip -expect 500000 -name "7zr.exe 解压工具")) {
         Bad "解压工具下载失败，无法继续"
@@ -356,8 +378,8 @@ if (-not $SkipModels) {
     Get-BigFile -urls @($OWN_UNET, $MS_UNET)          -dest (Join-Path $models "unet\flux-2-klein-9b-fp8.safetensors") -expect 9433061528 -name "主模型 (8.79 GB)"   | Out-Null
 
     # 包里自带的两个模型（如果有，就本地复制，省一次下载）
-    $bundled = Join-Path $here "4-附加模型"
-    if (Test-Path $bundled) {
+    $bundled = Resolve-Asset @("4-附加模型")
+    if ($bundled) {
         foreach ($p in @(@("F2K9B_ObjectRemover.safetensors","loras"), @("General.safetensors","BiRefNet"))) {
             $src = Join-Path $bundled $p[0]
             $dst = Join-Path $models ($p[1] + "\" + $p[0])
@@ -450,14 +472,14 @@ foreach ($n in $nodes) {
 }
 
 # 关掉后端用的小节点（本包自带）
-$ctrlSrc = Join-Path $here "3-自定义节点\cleanbg_control"
+$ctrlSrc = Resolve-Asset @("3-自定义节点\cleanbg_control", "custom_nodes\cleanbg_control")
 $ctrlDst = Join-Path $custom "cleanbg_control"
-if (Test-Path $ctrlSrc) {
+if ($ctrlSrc) {
     if (Test-Path $ctrlDst) { Remove-Item $ctrlDst -Recurse -Force -ErrorAction SilentlyContinue }
     Copy-Item $ctrlSrc $ctrlDst -Recurse -Force
     Ok "cleanbg_control 已安装（提供一键关闭接口）"
 } else {
-    Warn "安装包里没有 cleanbg_control，【关闭 ComfyUI】按钮会退化成跑脚本"
+    Warn "没找到 cleanbg_control（3-自定义节点\ 或 custom_nodes\），【关闭 ComfyUI】按钮会退化成跑脚本"
 }
 
 # pip 依赖
@@ -480,16 +502,21 @@ if (Test-Path $pyEmbed) {
 
 # ------------------------------------------------------------------ 第 7 步：后端脚本 + PS 插件
 Step 7 8 "安装后端脚本和 Photoshop 插件"
+$backendGot = 0
 foreach ($f in @("start_comfy.bat", "stop_comfy.bat", "comfy_watchdog.vbs")) {
-    $s = Join-Path $here ("2-后端脚本\" + $f)
-    if (Test-Path $s) { Copy-Item $s (Join-Path $InstallDir $f) -Force }
+    $s = Resolve-Asset @(("2-后端脚本\" + $f), ("backend\" + $f))
+    if ($s) { Copy-Item $s (Join-Path $InstallDir $f) -Force; $backendGot++ }
 }
-Ok "后端脚本已放到 $InstallDir"
+if ($backendGot -eq 3) {
+    Ok "后端脚本已放到 $InstallDir"
+} else {
+    Warn ("后端脚本只找到 " + $backendGot + "/3 个 —— 桌面快捷方式可能无效，请把日志发给作者")
+}
 
 if ($PSPlugins) {
-    $srcPlugin = Join-Path $here "1-插件本体\cleanbg"
+    $srcPlugin = Resolve-Asset @("1-插件本体\cleanbg", "插件\cleanbg", "plugin\cleanbg")
     $dstPlugin = Join-Path $PSPlugins "cleanbg"
-    if (Test-Path $srcPlugin) {
+    if ($srcPlugin) {
         if (Test-Path $dstPlugin) { Remove-Item $dstPlugin -Recurse -Force -ErrorAction SilentlyContinue }
         Copy-Item $srcPlugin $dstPlugin -Recurse -Force
         # 把插件里的后端路径改成这台电脑的安装目录（新老两种格式都兼容；写完必须读回校验）
@@ -528,7 +555,7 @@ if ($PSPlugins) {
             Bad "路径改写没生效！插件会退化成运行时自动查找后端目录（一般也能用），但请把日志发给作者。"
         }
     } else {
-        Warn "安装包里没有 1-插件本体\cleanbg"
+        Warn "没找到插件文件（1-插件本体\cleanbg 或 plugin\cleanbg）—— 请把日志发给作者"
     }
 }
 

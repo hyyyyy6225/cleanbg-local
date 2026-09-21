@@ -50,7 +50,8 @@
 ### 方式一：自动安装（推荐，约 20 GB 下载）
 
 1. 下载本仓库（绿 Code → Download ZIP）并解压
-2. 双击 `installer/auto/①双击我开始安装.bat`
+2. 双击解压出来的文件夹**最外层**的 `①一键安装（新电脑）.bat`
+   （它只是个入口，转发到 `installer/auto/①双击我开始安装.bat`，少点几层文件夹）
 3. 弹 UAC 点【是】；杀毒软件拦截就选【允许/信任】
 4. 它会自动做完：检查电脑 → 装 VC++ 运行库 → 下载并解压 ComfyUI 便携版 →
    下载 6 个模型（国内 ModelScope / hf-mirror 直连）→ 装 6 个自定义节点 →
@@ -68,13 +69,14 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1 -InstallDir "E:\ComfyUI"
 已经有一份别人做好的 `清空环境-便携版`（python 运行时 + ComfyUI + 模型全在里面）时：
 
 1. 把整个文件夹拷到电脑上（路径尽量浅，如 `D:\清空环境-便携版`）
-2. 双击 `installer/portable/①双击我安装插件.bat`
+2. 双击**便携版文件夹里**的 `①双击我安装插件.bat`（便携版整包自带的，和本仓库 `installer/portable/` 里是同一份）
 
 ### 方式三：只更新插件
 
 已经装过旧版插件、只想升级到最新版：
 
-双击 `installer/patch/①双击更新插件.bat`
+双击解压出来的文件夹**最外层**的 `①更新插件（已装过）.bat`
+（等价于 `installer/patch/①双击更新插件.bat`）
 （自动找到所有已安装的 `cleanbg` 目录 → 备份 `.bak` → 覆盖 → 写后端路径 → 哈希自检）
 
 安装完**必须重启 Photoshop**（UXP 插件只在启动时加载）。
@@ -105,6 +107,8 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1 -InstallDir "E:\ComfyUI"
 ## 目录结构
 
 ```
+①一键安装（新电脑）.bat   最外层快捷入口 → 转发到 installer/auto/
+①更新插件（已装过）.bat   最外层快捷入口 → 转发到 installer/patch/
 plugin/cleanbg/          Photoshop UXP 插件本体（main.js / index.html / manifest.json / icons）
 installer/auto/          从零自动安装（下载 ComfyUI + 模型 + 节点）
 installer/portable/      便携版安装（离线整包，只装插件、指路径）
