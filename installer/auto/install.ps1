@@ -283,6 +283,25 @@ $PORTABLE_MIR = @(
     $PORTABLE_GH
 )
 
+# ---------------------------------------------------------------- 自定义节点包的下载源
+# github.com 在国内经常连不上（curl 56 Connection reset / 28 Failed to connect），
+# 所以每个节点包都按「GitHub 镜像 → 作者自建魔搭镜像 → 直连 GitHub」的顺序试。
+$GH_MIRRORS = @(
+    "https://gh-proxy.com/",
+    "https://hk.gh-proxy.com/",
+    "https://ghfast.top/",
+    "https://ghproxy.net/"
+)
+$OWN_NODES  = "https://modelscope.cn/api/v1/models/zdccy123/cleanbg-models/repo?Revision=master&FilePath=nodes%2F"
+function Get-NodeUrls {
+    param([string]$GhUrl, [string]$Mine)
+    $list = @()
+    foreach ($m in $GH_MIRRORS) { $list += ($m + $GhUrl) }
+    if ($Mine) { $list += ($OWN_NODES + $Mine) }
+    $list += $GhUrl
+    return $list
+}
+
 if ($CheckOnly) {
     Step 0 1 "只测试下载源（不安装）"
     $tests = @(
@@ -292,7 +311,9 @@ if ($CheckOnly) {
         @("VAE(自建镜像)",             $OWN_VAE),
         @("放大模型",        $OWN_UP),
         @("移除 LoRA",       $OWN_LORA),
-        @("抠人 BiRefNet",   $OWN_BIRE)
+        @("抠人 BiRefNet",   $OWN_BIRE),
+        @("节点包(GitHub镜像)", "https://gh-proxy.com/https://github.com/kijai/ComfyUI-KJNodes/archive/refs/heads/main.zip"),
+        @("节点包(魔搭自建)",   ($OWN_NODES + "ComfyUI-KJNodes.zip"))
     )
     foreach ($t in $tests) {
         if (Test-Url -url $t[1]) { Ok ($t[0] + " 下载源可用") } else { Bad ($t[0] + " 下载源不可用：" + $t[1]) }
@@ -327,7 +348,7 @@ Step 4 8 "下载并解压 ComfyUI（约 1.8 GB）"
 $sevenZip = Resolve-Asset @("7zr.exe")
 if (-not $sevenZip) {
     $sevenZip = Join-Path $stage "7zr.exe"
-    if (-not (Get-BigFile -urls @("https://github.com/ip7z/7zip/releases/download/26.03/7zr.exe") -dest $sevenZip -expect 500000 -name "7zr.exe 解压工具")) {
+    if (-not (Get-BigFile -urls (Get-NodeUrls -GhUrl "https://github.com/ip7z/7zip/releases/download/26.03/7zr.exe" -Mine "7zr.exe") -dest $sevenZip -expect 500000 -name "7zr.exe 解压工具")) {
         Bad "解压工具下载失败，无法继续"
         Read-Host "`n按回车键退出"; exit 1
     }
@@ -456,7 +477,8 @@ foreach ($n in $nodes) {
     $target = Join-Path $custom $n.dir
     if (Test-Path $target) { Ok ($n.name + " 已安装，跳过"); continue }
     $zip = Join-Path $stage ($n.name + ".zip")
-    if (-not (Get-BigFile -urls @($n.zip) -dest $zip -expect 5000 -name ($n.name + " 节点包"))) { Bad ($n.name + " 下载失败"); continue }
+    $nodeUrls = Get-NodeUrls -GhUrl $n.zip -Mine ($n.name + ".zip")
+    if (-not (Get-BigFile -urls $nodeUrls -dest $zip -expect 5000 -name ($n.name + " 节点包"))) { Bad ($n.name + " 下载失败"); continue }
     $tmp = Join-Path $stage ("x_" + $n.name)
     if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }
     try {
