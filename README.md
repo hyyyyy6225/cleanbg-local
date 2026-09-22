@@ -44,6 +44,7 @@
 > 作者已把安装包和模型都镜像到**魔搭（ModelScope）**，国内直连、速度快：
 >
 > - 📦 **一键安装包（375 KB，已修复节点下载）**：https://modelscope.cn/models/zdccy123/cleanbg-downloads
+> - 🧹 **一键卸载工具（10 KB）**：同一个仓库里的 `cleanbg-uninstaller-1.0.zip`
 > - 🧩 模型镜像：`zdccy123/cleanbg-models`（安装脚本会自动从这里下载）
 > - 如果非要走 GitHub，给链接加个加速前缀即可：`https://gh-proxy.com/` + 原链接
 
@@ -81,6 +82,22 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1 -InstallDir "E:\ComfyUI"
 
 安装完**必须重启 Photoshop**（UXP 插件只在启动时加载）。
 
+### 方式四：卸载（不想要了，20~45 GB 一键清）
+
+双击解压出来的文件夹**最外层**的 `①双击我卸载.bat`（即 `installer/uninstall/①双击我卸载.bat`），
+或者从魔搭下 **`cleanbg-uninstaller-1.0.zip`**（10 KB）。
+
+它会：关掉正在跑的后端 → 把插件**备份到桌面** `cleanbg-卸载备份\<时间>\`（附「怎么恢复.txt」）→ 删掉插件 →
+删掉桌面那两个快捷方式 → 可选清插件设置缓存 → **逐个问你**要不要删后端（ComfyUI + 模型）→ 可选清 `_下载缓存`。
+
+**安全设计**：只认这几种"自己人"指纹 —— 便携版整包（`install-plugin.ps1` + `插件\cleanbg\main.js`）、
+自动安装版（根目录 `cleanbg-install.json`）、桌面「启动/关闭 ComfyUI」快捷方式指向的目录、
+或默认安装位置 `C:\ComfyUI` / `D:\ComfyUI` / `E:\ComfyUI`。
+带「绘世启动器 / .launcher / 秋葉」痕迹的 ComfyUI 一律视为用户自己的，**只列出、绝不删**
+（实测 `F:\ComfyUI-aki-v2` 169 GB 不受影响）；每一处删除都会先打印路径和大小。
+
+想先看它打算删什么：给 `①双击我卸载.bat` 加参数 `-DryRun`（约 20 秒，不动任何文件）。
+
 ---
 
 ## 使用
@@ -113,6 +130,7 @@ plugin/cleanbg/          Photoshop UXP 插件本体（main.js / index.html / man
 installer/auto/          从零自动安装（下载 ComfyUI + 模型 + 节点）
 installer/portable/      便携版安装（离线整包，只装插件、指路径）
 installer/patch/         已装旧版的升级补丁
+installer/uninstall/     一键卸载（插件 + 可选后端，带备份与安全指纹）
 backend/                 启动 / 关闭 / 看门狗脚本（纯 ASCII，路径自识别）
 custom_nodes/cleanbg_control/  自研小节点，只提供 GET /cleanbg/ping 和 POST /cleanbg/shutdown
 tools/                   离线测试与校验脚本
@@ -126,6 +144,10 @@ docs/依赖清单.md          模型与节点清单（含大小、来源、许�
 **点【启动 ComfyUI】失败怎么办？**
 面板【后端目录】下面那行会变红并写明原因；日志里会打印当前目录和真实报错。
 点【自动查找】，或手动填后端文件夹路径（判据只有一个：里面有没有 `start_comfy.bat`）后点【应用】。
+
+**不想要了怎么彻底卸载？**
+双击最外层的 `①双击我卸载.bat`：插件会被备份到桌面再删除，后端（20~45 GB）会**逐个问你**再删。
+它不会碰你自己另外装的 ComfyUI（详见上面「方式四」）。只想留后端就一路跳过即可。
 
 **安装脚本报错了？**
 同目录的「安装日志.txt / 更新日志.txt」每一行都有 `[OK] / [注意] / [失败]` 标记，看 `[失败]` 那几行。

@@ -377,6 +377,11 @@ if (-not $InstallDir) {
     if (Test-Path "D:\") { $InstallDir = "D:\ComfyUI" } else { $InstallDir = "C:\ComfyUI" }
 }
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+# 写一个安装标记：卸载工具靠它认出「这是我们装的后端」（别删这个文件）
+try {
+    $mark = @{ tool = "cleanbg"; version = "2.6"; installedAt = (Get-Date).ToString("s"); installDir = $InstallDir } | ConvertTo-Json -Compress
+    [System.IO.File]::WriteAllText((Join-Path $InstallDir "cleanbg-install.json"), $mark, (New-Object System.Text.UTF8Encoding($false)))
+} catch {}
 $drive = (Get-Item $InstallDir).PSDrive.Name + ":"
 $freeGB = [math]::Round((Get-PSDrive ($drive.TrimEnd(':'))).Free / 1GB, 1)
 Log ("  安装目录: $InstallDir")
