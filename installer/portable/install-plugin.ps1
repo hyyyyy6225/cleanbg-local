@@ -122,17 +122,65 @@ if ($vcInstalled) {
 
 # ---------------------------------------------------------------- 找 Photoshop
 Banner "安装 Photoshop 插件"
+function Get-PluginsFromExe {
+    param([string]$Exe)
+    if (-not $Exe) { return $null }
+    $dir = Split-Path -Parent (([string]$Exe).Trim('"', ' '))
+    if (-not $dir -or -not (Test-Path $dir)) { return $null }
+    foreach ($n in @('Plug-ins', 'Plug-Ins', 'Plugins')) {
+        $p = Join-Path $dir $n
+        if (Test-Path $p) { return $p }
+    }
+    return $null
+}
 function Find-PSPlugins {
+    # 从准到糙：①运行中的 PS ②App Paths ③Adobe 注册表 ④卸载项 ⑤扫盘 ⑥老位置
     $found = @()
-    foreach ($base in @("C:\Program Files\Adobe", "C:\Program Files (x86)\Adobe", "D:\Program Files\Adobe", "D:\Adobe", "E:\Adobe")) {
-        if (Test-Path $base) {
-            $found += Get-ChildItem $base -Directory -ErrorAction SilentlyContinue |
-                      Where-Object { $_.Name -like "Adobe Photoshop*" } |
-                      ForEach-Object { Join-Path $_.FullName "Plug-ins" } |
-                      Where-Object { Test-Path $_ }
+    foreach ($proc in (Get-Process -Name Photoshop -ErrorAction SilentlyContinue)) {
+        try { $r = Get-PluginsFromExe $proc.Path; if ($r) { $found += $r } } catch {}
+    }
+    foreach ($k in @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\Photoshop.exe',
+                     'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\App Paths\Photoshop.exe')) {
+        $v = (Get-ItemProperty -Path $k -ErrorAction SilentlyContinue).'(default)'
+        if ($v) { $r = Get-PluginsFromExe $v; if ($r) { $found += $r } }
+    }
+    foreach ($sub in (Get-ChildItem -Path 'HKLM:\SOFTWARE\Adobe\Photoshop' -ErrorAction SilentlyContinue)) {
+        foreach ($n in @('PluginPath', 'PluginsPath', 'ApplicationPath')) {
+            $v = (Get-ItemProperty -Path $sub.PSPath -Name $n -ErrorAction SilentlyContinue).$n
+            if (-not $v) { continue }
+            foreach ($one in @($v)) {
+                $one = ([string]$one).Trim().TrimEnd('\')
+                if (-not $one) { continue }
+                if ($one -match '(?i)plug-?ins$') { if (Test-Path $one) { $found += $one } }
+                else { $r = Get-PluginsFromExe (Join-Path $one 'Photoshop.exe'); if ($r) { $found += $r } }
+            }
         }
     }
-    return $found
+    foreach ($root in @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+                        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall')) {
+        Get-ItemProperty -Path ($root + '\*') -ErrorAction SilentlyContinue |
+            Where-Object { $_.DisplayName -like '*Photoshop*' -and $_.InstallLocation } |
+            ForEach-Object { $r = Get-PluginsFromExe (Join-Path $_.InstallLocation 'Photoshop.exe'); if ($r) { $found += $r } }
+    }
+    $drives = @()
+    try { $drives = @(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' -ErrorAction Stop | ForEach-Object { $_.DeviceID + '\' }) } catch {}
+    if ($drives.Count -eq 0) { $drives = @('C:\', 'D:\', 'E:\', 'F:\', 'G:\') }
+    foreach ($root in $drives) {
+        foreach ($d in (Get-ChildItem -Path ($root + 'Adobe Photoshop*') -Directory -ErrorAction SilentlyContinue)) {
+            $r = Get-PluginsFromExe (Join-Path $d.FullName 'Photoshop.exe'); if ($r) { $found += $r }
+            foreach ($d2 in (Get-ChildItem -Path (Join-Path $d.FullName 'Adobe Photoshop*') -Directory -ErrorAction SilentlyContinue)) {
+                $r2 = Get-PluginsFromExe (Join-Path $d2.FullName 'Photoshop.exe'); if ($r2) { $found += $r2 }
+            }
+        }
+        foreach ($base in @('Program Files\Adobe', 'Program Files (x86)\Adobe', 'Adobe')) {
+            $b = Join-Path $root $base
+            if (-not (Test-Path $b)) { continue }
+            $found += Get-ChildItem -Path $b -Directory -ErrorAction SilentlyContinue |
+                      Where-Object { $_.Name -like 'Adobe Photoshop*' } |
+                      ForEach-Object { foreach ($n in @('Plug-ins', 'Plug-Ins')) { $p = Join-Path $_.FullName $n; if (Test-Path $p) { $p } } }
+        }
+    }
+    return @($found | Where-Object { $_ } | Sort-Object -Unique)
 }
 if (-not ($PSPlugins -and (Test-Path $PSPlugins))) {
     $cands = Find-PSPlugins

@@ -79,23 +79,89 @@ if ($newText -notmatch 'COMFY_DIR_DEFAULT') {
 Ok "补丁里的插件文件就位（v4 版本）"
 
 # ---------------------------------------------------------------- 找 Photoshop
-$cands = @()
-foreach ($base in @("C:\Program Files\Adobe", "C:\Program Files (x86)\Adobe", "D:\Program Files\Adobe", "D:\Adobe", "E:\Adobe", "F:\Adobe")) {
-    if (Test-Path $base) {
-        $cands += Get-ChildItem $base -Directory -ErrorAction SilentlyContinue |
-                  Where-Object { $_.Name -like "Adobe Photoshop*" } |
-                  ForEach-Object { Join-Path $_.FullName "Plug-ins" } |
-                  Where-Object { Test-Path $_ }
+# 从准到糙依次尝试：①正在运行的 PS ②App Paths 注册表 ③Adobe 注册表(PluginPath/ApplicationPath)
+# ④卸载列表里的 InstallLocation ⑤各盘扫 "Adobe Photoshop*" 目录 ⑥老式硬编码位置 ⑦手动输入兜底
+function Get-PluginsFromExe {
+    param([string]$Exe)
+    if (-not $Exe) { return $null }
+    $dir = Split-Path -Parent (([string]$Exe).Trim('"', ' '))
+    if (-not $dir -or -not (Test-Path $dir)) { return $null }
+    foreach ($n in @('Plug-ins', 'Plug-Ins', 'Plugins')) {
+        $p = Join-Path $dir $n
+        if (Test-Path $p) { return $p }
     }
+    return $null
 }
+function Find-PSPlugins {
+    $out = @()
+    foreach ($proc in (Get-Process -Name Photoshop -ErrorAction SilentlyContinue)) {
+        try { $r = Get-PluginsFromExe $proc.Path; if ($r) { $out += $r } } catch {}
+    }
+    foreach ($k in @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\Photoshop.exe',
+                     'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\App Paths\Photoshop.exe')) {
+        $v = (Get-ItemProperty -Path $k -ErrorAction SilentlyContinue).'(default)'
+        if ($v) { $r = Get-PluginsFromExe $v; if ($r) { $out += $r } }
+    }
+    foreach ($sub in (Get-ChildItem -Path 'HKLM:\SOFTWARE\Adobe\Photoshop' -ErrorAction SilentlyContinue)) {
+        foreach ($n in @('PluginPath', 'PluginsPath', 'ApplicationPath')) {
+            $v = (Get-ItemProperty -Path $sub.PSPath -Name $n -ErrorAction SilentlyContinue).$n
+            if (-not $v) { continue }
+            foreach ($one in @($v)) {
+                $one = ([string]$one).Trim().TrimEnd('\')
+                if (-not $one) { continue }
+                if ($one -match '(?i)plug-?ins$') { if (Test-Path $one) { $out += $one } }
+                else { $r = Get-PluginsFromExe (Join-Path $one 'Photoshop.exe'); if ($r) { $out += $r } }
+            }
+        }
+    }
+    foreach ($root in @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+                        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall')) {
+        Get-ItemProperty -Path ($root + '\*') -ErrorAction SilentlyContinue |
+            Where-Object { $_.DisplayName -like '*Photoshop*' -and $_.InstallLocation } |
+            ForEach-Object { $r = Get-PluginsFromExe (Join-Path $_.InstallLocation 'Photoshop.exe'); if ($r) { $out += $r } }
+    }
+    $drives = @()
+    try { $drives = @(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' -ErrorAction Stop | ForEach-Object { $_.DeviceID + '\' }) } catch {}
+    if ($drives.Count -eq 0) { $drives = @('C:\', 'D:\', 'E:\', 'F:\', 'G:\') }
+    foreach ($root in $drives) {
+        # 盘根下的 "Adobe Photoshop*\Adobe Photoshop *"（F:\Adobe Photoshop\Adobe Photoshop 2026 这种）
+        foreach ($d in (Get-ChildItem -Path ($root + 'Adobe Photoshop*') -Directory -ErrorAction SilentlyContinue)) {
+            $r = Get-PluginsFromExe (Join-Path $d.FullName 'Photoshop.exe'); if ($r) { $out += $r }
+            foreach ($d2 in (Get-ChildItem -Path (Join-Path $d.FullName 'Adobe Photoshop*') -Directory -ErrorAction SilentlyContinue)) {
+                $r2 = Get-PluginsFromExe (Join-Path $d2.FullName 'Photoshop.exe'); if ($r2) { $out += $r2 }
+            }
+        }
+        # Program Files\Adobe\Adobe Photoshop* 之类
+        foreach ($base in @('Program Files\Adobe', 'Program Files (x86)\Adobe', 'Adobe')) {
+            $b = Join-Path $root $base
+            if (-not (Test-Path $b)) { continue }
+            $out += Get-ChildItem -Path $b -Directory -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Name -like 'Adobe Photoshop*' } |
+                    ForEach-Object { foreach ($n in @('Plug-ins', 'Plug-Ins')) { $p = Join-Path $_.FullName $n; if (Test-Path $p) { $p } } }
+        }
+    }
+    return @($out | Where-Object { $_ } | Sort-Object -Unique)
+}
+
+$cands = Find-PSPlugins
 if ($PSPlugins -and (Test-Path $PSPlugins)) { $cands = @($PSPlugins) + $cands }
-$cands = $cands | Select-Object -Unique
+$cands = @($cands | Sort-Object -Unique)
 if ($cands.Count -eq 0) {
-    Bad "没找到 Photoshop 的 Plug-ins 目录"
-    Log "  请确认 Photoshop 装在 C 盘或 D 盘的 Adobe 目录下；也可以手动把" "Yellow"
-    Log ("  " + $newSrc + " 整个文件夹复制到 Photoshop 的 Plug-ins 里。") "Yellow"
-    Read-Host "`n按回车键退出"
-    exit
+    Bad "自动查找没找到 Photoshop 的 Plug-ins 目录（这台电脑的安装位置比较特别）"
+    Log "  可以手动填一次路径。不知道在哪？右键桌面上的 Photoshop 图标 → 「打开文件所在位置」，" "Yellow"
+    Log "  地址栏里就是安装目录；把它（或直接是 Plug-ins 目录）粘到下面就行。" "Yellow"
+    $manual = Read-Host "  请粘贴路径（直接回车=放弃，改用手动复制）"
+    if ($manual) {
+        $manual = ([string]$manual).Trim().Trim('"')
+        if (Test-Path (Join-Path $manual 'Photoshop.exe')) { $manual = Join-Path $manual 'Plug-ins' }
+        if (Test-Path $manual) { $cands = @($manual) }
+    }
+    if ($cands.Count -eq 0) {
+        Log "  也可以手动把下面这个文件夹整个复制到 Photoshop 的 Plug-ins 里：" "Yellow"
+        Log ("  " + $newSrc) "Yellow"
+        Read-Host "`n按回车键退出"
+        exit
+    }
 }
 foreach ($c in $cands) { Log ("  发现插件目录：" + $c) }
 
