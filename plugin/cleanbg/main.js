@@ -201,6 +201,10 @@ function log(msg) {
   const el = $("log");
   const t = new Date().toTimeString().slice(0, 8);
   el.textContent += `[${t}] ${msg}\n`;
+  // 防止日志无限增长（长期开着面板会一直累积内存）：超过 8000 字符只留最近部分
+  try {
+    if (el.textContent.length > 8000) el.textContent = el.textContent.slice(-6000);
+  } catch (e) { /* 忽略 */ }
   el.scrollTop = el.scrollHeight;
 }
 function setStatus(s) { statusEl().textContent = s; }
@@ -644,6 +648,46 @@ async function placeResult(fileName, docId, addSelMask) {
   }, { commandName: "置入清空环境结果" });
 }
 
+// ---------- 跑完清理：只删本插件自己生成的临时文件 ----------
+// input 里是 ps_cleanbg_*.png（导出的源图/蒙版），output 里是 cleanbg_*.png（结果，已置入 PS）。
+// 只按这两个前缀删，绝不碰用户或其它工具放进 input/output 的文件。
+async function cleanupTempFiles() {
+  const jobs = [
+    [COMFY_ROOT + "/input",  "ps_cleanbg_"],
+    [COMFY_ROOT + "/output", "cleanbg_"]
+  ];
+  for (const [dir, prefix] of jobs) {
+    try {
+      const folder = await fs.getEntryWithUrl("file:///" + dir);
+      const es = await folder.getEntries();
+      let n = 0;
+      for (const e of es) {
+        try {
+          const nm = String(e.name || "");
+          if (nm.indexOf(prefix) === 0) { await e.delete(); n++; }
+        } catch (er) { /* 单个删失败不阻塞 */ }
+      }
+      if (n) log("已清理 " + n + " 个临时文件（" + prefix + "*）");
+    } catch (e) { /* input/output 不存在或不可访问就跳过 */ }
+  }
+}
+
+// ---------- 释放显存 ----------
+// 走 ComfyUI 的 /free 接口：unload=彻底卸载模型（下张要重新加载，但显存彻底清空），
+// free=仅清缓存（模型保留，下一张不用重载，基本无损）。false=温和版，true=彻底版。
+async function freeComfyMemory(unload) {
+  try {
+    const r = await fetchTimeout(`${API}/free`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ unload_models: !!unload, free_memory: true })
+    }, 8000);
+    if (r && r.ok) log(unload ? "已彻底释放显存（模型已卸载，下次处理会重新加载）" : "已释放显存缓存（模型保留，下一张不用重载）");
+  } catch (e) {
+    log("释放显存失败（后端可能不支持 /free）：" + (e && e.message ? e.message : e));
+  }
+}
+
 // ---------- 主流程 ----------
 async function run() {
   if (busy) return;
@@ -767,6 +811,10 @@ async function run() {
   } finally {
     closeProgressSocket();
     if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
+    // 改进①：每次跑完自动清理本插件生成的临时文件（input/output 不再越积越多）
+    cleanupTempFiles();
+    // 改进②：若勾选了「跑完自动释放显存」，则彻底卸载模型、清空显存缓存
+    try { if ($("autoFree") && $("autoFree").checked) freeComfyMemory(true); } catch (e) {}
   }
 }
 
@@ -914,6 +962,19 @@ async function stopComfy() {
   $("run").addEventListener("click", run);
   $("startComfy").addEventListener("click", startComfy);
   $("stopComfy").addEventListener("click", stopComfy);
+
+  // 改进③：「释放显存」按钮 + 「跑完自动释放」选项（记住勾选状态）
+  try {
+    const af = $("autoFree");
+    if (af) {
+      try { af.checked = localStorage.getItem("cleanbg.autoFree") === "1"; } catch (e) { }
+      af.addEventListener("change", () => {
+        try { localStorage.setItem("cleanbg.autoFree", af.checked ? "1" : "0"); } catch (e) { }
+      });
+    }
+    const fn = $("freeNow");
+    if (fn) fn.addEventListener("click", () => freeComfyMemory(true));
+  } catch (e) { /* 忽略 */ }
 
   // 处理范围切换：只有「仅清理 PS 选区」才显示反选
   try {

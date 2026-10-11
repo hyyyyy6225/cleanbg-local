@@ -4,16 +4,18 @@
   <meta charset="utf-8" />
   <style>
     * { box-sizing: border-box; }
+    html, body { height: 100%; }
     body {
       margin: 0; padding: 10px;
       font-family: "Microsoft YaHei", sans-serif; font-size: 12px;
       background: #232323; color: #e6e6e6;
+      overflow-y: auto;   /* 面板内容超出时可用滚轮滚动查看 */
     }
-    h3 { margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #fff; }
-    .row { margin-bottom: 8px; }
+    h3 { margin: 0 0 6px 0; font-size: 13px; font-weight: 600; color: #fff; }
+    .row { margin-bottom: 6px; }
     label { display: block; margin-bottom: 3px; color: #a8a8a8; font-size: 11px; }
     textarea {
-      width: 100%; height: 88px; resize: vertical;
+      width: 100%; height: 64px; resize: vertical;
       background: #2f2f2f; color: #e6e6e6; border: 1px solid #454545;
       border-radius: 4px; padding: 6px; font-size: 11px; line-height: 1.45;
       font-family: "Microsoft YaHei", sans-serif;
@@ -30,7 +32,7 @@
     .grid2 { display: flex; gap: 6px; }
     .grid2 > div { flex: 1; }
     button {
-      width: 100%; padding: 8px; margin-bottom: 6px;
+      width: 100%; padding: 7px; margin-bottom: 6px;
       background: #3d6be0; color: #fff; border: none; border-radius: 5px;
       font-size: 12px; cursor: pointer; font-family: "Microsoft YaHei", sans-serif;
     }
@@ -54,7 +56,7 @@
 
     #status { font-size: 11px; color: #9fd0ff; margin: 6px 0 2px 0; min-height: 15px; }
     #log {
-      margin-top: 6px; height: 104px; overflow-y: auto;
+      margin-top: 6px; height: 84px; overflow-y: auto;
       background: #1b1b1b; border: 1px solid #383838; border-radius: 4px;
       padding: 5px; font-size: 10px; line-height: 1.5; color: #b8b8b8;
       white-space: pre-wrap; word-break: break-all;
@@ -118,6 +120,13 @@
     <div><button id="stopComfy" class="ghost">关闭 ComfyUI</button></div>
   </div>
 
+  <div class="row grid2">
+    <div><button id="freeNow" class="ghost">释放显存</button></div>
+    <div style="display:flex;align-items:center;font-size:11px;color:#a8a8a8;">
+      <input type="checkbox" id="autoFree" style="width:auto;margin-right:5px;vertical-align:-1px;" />跑完自动释放显存
+    </div>
+  </div>
+
   <div class="row">
     <label>后端目录（ComfyUI 便携版所在文件夹 · 挪过位置就改这里，会自动记住）</label>
     <div class="grid2" style="align-items:center;">
@@ -131,12 +140,8 @@
   <div id="status">就绪</div>
   <div id="log"></div>
   <div class="hint">
-    结果会作为新图层（智能对象）置入当前文档，原图不动；不满意的部分用蒙版擦。<br>
-    <b>自动保护人物</b>：用 BiRefNet 抠出人物，只重绘背景，人物像素级不动（约多花 5 秒）。<br>
-    <b>仅清理 PS 选区</b>：先在 PS 里框出要清的区域，只重绘框内。<br>
-    用公开模型 flux-2-klein-9b-fp8，无需联网登录。<br>
-    <b>后端不会自动启动</b>：要用的时候点【启动 ComfyUI】。<br>
-    <b>关闭 Photoshop 时后端会自动关闭</b>；也可以点【关闭 ComfyUI】立刻关掉、释放显存。
+    结果作为新图层置入当前文档，原图不动；不满意用蒙版擦。用公开模型 flux-2-klein-9b-fp8，无需登录。<br>
+    后端不会自动启动，点【启动 ComfyUI】；关 PS 会自动关后端，也可点【关闭 ComfyUI】立刻释放显存。
   </div>
 
   <script src="main.js"></script>
